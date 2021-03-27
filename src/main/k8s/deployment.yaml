@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: java-k8s-playground
+  name: java-k8s-playground
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: java-k8s-playground
+  template:
+    metadata:
+      labels:
+        app: java-k8s-playground
+    spec:
+      containers:
+        - name: java-k8s-playground
+          image: dmetzler/java-k8s-playground
+
+          # Health probes (1)
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /q/health/live
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 10
+          readinessProbe:
+            failureThreshold: 15
+            httpGet:
+              path: /q/health/ready
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+
+          # We ask to run the troubleshoot script when stopping (2)
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - /scripts/pre-stop.sh
+
+
+          # Volumes to get the script and store the result
+          volumeMounts:
+            # The config map that contains the script
+            - mountPath: /scripts
+              name: scripts
+            # Where to store the information
+            - mountPath: /troubleshoot
+              name: troubleshoot
+      volumes:
+        - emptyDir: {}
+          name: troubleshoot
+        - configMap:
+            defaultMode: 493
+            name: pre-stop-scripts
+          name: scripts
+
+      terminationGracePeriodSeconds: 30

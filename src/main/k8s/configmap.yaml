@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pre-stop-scripts
+data:
+  pre-stop.sh: |
+    #!/bin/bash
+    set +e
+
+    NOW=`date +"%Y-%m-%d_%H-%M-%S"`
+    LOGFILE=/troubleshoot/${HOSTNAME}_${NOW}.txt
+
+    {
+      echo == Open Connections =======
+      netstat -an
+      echo
+
+      echo == Process Status info ===================
+      cat /proc/1/status
+      echo
+
+      echo == Health endpoint =========================
+      curl -m 3 localhost:8080/q/health/live > /dev/termination-log
+      if [ $? -gt 0 ];  then
+        echo "Health endpoint resulted in ERROR"
+      fi
+      cat /dev/termination-log
+      echo
+
+      echo == JVM Memory usage ======================
+      jcmd 1 VM.native_memory
+      echo == Thread dump ===========================
+      jcmd 1 Thread.print
+
+    } >> $LOGFILE 2>&1
